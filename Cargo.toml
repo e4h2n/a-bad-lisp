@@ -1,0 +1,7 @@
+[package]
+name = "interpreter"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.6.6", features = ["derive"] }
+itertools = "0.15.0"
