@@ -38,7 +38,6 @@ impl FromStr for Primitive {
     }
 }
 
-
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum LexerMode {
     Literal, // only explicit 'l'i't'e'r'a'l's
@@ -141,8 +140,6 @@ where
 
         self.transition_mode(delimiter);
 
-        if self.token_buffer.is_empty() {
-            return self.next()
-        } return self.token_buffer.pop_front();
+        return self.next();
     }
 }
