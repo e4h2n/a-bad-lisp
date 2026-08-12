@@ -13,7 +13,7 @@ pub enum Parenthesis {
     Close,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Primitive {
     Number(i32),
     Literal(char),

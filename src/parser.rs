@@ -12,7 +12,7 @@ impl AstNode {
     fn parse<Iter: Iterator<Item = Token>>(iter: &mut Iter) -> Self {
         match iter.next() {
             Some(Token::Identifier(string)) => AstNode::Identifier(string.clone()),
-            Some(Token::Primitive(primitive)) => AstNode::Primitive(primitive.clone()),
+            Some(Token::Primitive(primitive)) => AstNode::Primitive(primitive),
             Some(Token::Parenthesis(Parenthesis::Open)) => AstNode::List(
                 std::iter::repeat_with(|| Self::parse(iter))
                     .take_while(|node| *node != AstNode::Nil)
