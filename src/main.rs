@@ -3,7 +3,9 @@ use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 
+mod data;
 mod lexer;
+mod parser;
 
 enum Input {
     File(File),
@@ -42,9 +44,7 @@ fn main() -> io::Result<()> {
         .map(|byte| byte as char);
 
     let lexer = lexer::Lexer::new(input_chars);
-    for token in lexer {
-        print!("{:?} ", token);
-    }
-    println!("");
+    let tree: parser::AstNode = lexer.collect();
+    println!("{:#?}", tree);
     Ok(())
 }

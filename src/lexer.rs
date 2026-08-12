@@ -1,42 +1,7 @@
 use itertools::Itertools;
 
+use crate::data::*;
 use std::collections::VecDeque;
-use std::str::FromStr;
-
-#[derive(Debug)]
-pub enum Token {
-    Parenthesis(Parenthesis),
-    Identifier(String),
-    Primitive(Primitive),
-}
-
-#[derive(Debug)]
-pub enum Parenthesis {
-    Open,
-    Close,
-}
-
-#[derive(Debug)]
-pub enum Primitive {
-    Number(i32),
-    Literal(char),
-}
-
-pub struct ParseTokenError;
-
-impl FromStr for Primitive {
-    type Err = ParseTokenError;
-
-    fn from_str(string: &str) -> Result<Self, Self::Err> {
-        if string.starts_with("\'") && string.chars().count() == 2 {
-            Ok(Primitive::Literal(string.chars().nth(1).unwrap()))
-        } else if let Some(number) = string.parse::<i32>().ok() {
-            Ok(Primitive::Number(number))
-        } else {
-            Err(ParseTokenError)
-        }
-    }
-}
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum LexerMode {
@@ -47,7 +12,7 @@ enum LexerMode {
 impl LexerMode {
     fn is_delimiter(&self, character: char) -> bool {
         match (self, character) {
-            (LexerMode::Symbol, '\n' | ' ' | '(' | ')' | '\'') => true,
+            (LexerMode::Symbol, ' ' | '\n' | '\t' | '(' | ')' | '\'') => true,
             (LexerMode::Literal, _) => true,
             _ => false,
         }
@@ -69,6 +34,8 @@ where
     token_buffer: VecDeque<Token>,
     mode: LexerMode,
 }
+
+pub struct ParseTokenError;
 
 impl<Iter> Lexer<Iter>
 where
