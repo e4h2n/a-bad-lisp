@@ -6,7 +6,7 @@ pub enum AstNode {
     Primitive(Value),
     Identifier(String),
     // Function(name OR function defintion, args)
-    Pair(Box<AstNode>, Box<AstNode>) 
+    Pair(Box<AstNode>, Box<AstNode>),
 }
 
 #[derive(Debug)]
@@ -15,20 +15,18 @@ pub struct ParserError(pub String);
 impl AstNode {
     fn parse<Iter: Iterator<Item = Token>>(iter: &mut Iter) -> Result<Self, ParserError> {
         match iter.next() {
-            Some(Token::Identifier(identifier)) =>
-                Ok(AstNode::Identifier(identifier.clone())),
-            Some(Token::Primitive(primitive)) =>
-                Ok(AstNode::Primitive(primitive)),
+            Some(Token::Identifier(identifier)) => Ok(AstNode::Identifier(identifier.clone())),
+            Some(Token::Primitive(primitive)) => Ok(AstNode::Primitive(primitive)),
             Some(Token::Parenthesis(Parenthesis::Open)) => {
                 let car = Self::parse(iter)?;
                 let cdr = Self::parse(iter)?;
                 match iter.next() {
-                    Some(Token::Parenthesis(Parenthesis::Close)) =>
-                        Ok(AstNode::Pair(Box::new(car), Box::new(cdr))),
-                    _ =>
-                    Err(ParserError(
-                        "Expected closing parenthesis for pair!".to_string()
-                    ))
+                    Some(Token::Parenthesis(Parenthesis::Close)) => {
+                        Ok(AstNode::Pair(Box::new(car), Box::new(cdr)))
+                    }
+                    _ => Err(ParserError(
+                        "Expected closing parenthesis for pair!".to_string(),
+                    )),
                 }
             }
             _ => Ok(AstNode::Nil),

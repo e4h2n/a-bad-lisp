@@ -52,10 +52,7 @@ fn main() -> io::Result<()> {
             println!("EVALS TO:\n{:#?}", ast.eval(&interpreter::starting_env()));
         }
         Err(parser::ParserError(error)) => {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                error,
-            ));
+            return Err(std::io::Error::new(std::io::ErrorKind::Other, error));
         }
     }
     Ok(())
