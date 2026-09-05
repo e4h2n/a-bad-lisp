@@ -52,7 +52,7 @@ where
     fn string_to_token(&self, string: &str) -> Result<Token, ParseTokenError> {
         match (self.mode, string) {
             (_, "") => Err(ParseTokenError),
-            (LexerMode::Symbol, s) if let Some(literal) = s.parse::<Primitive>().ok() => {
+            (LexerMode::Symbol, s) if let Some(literal) = s.parse::<Value>().ok() => {
                 Ok(Token::Primitive(literal))
             }
             (LexerMode::Symbol, s) => Ok(Token::Identifier(s.to_string())),
@@ -64,7 +64,7 @@ where
         match (self.mode, character) {
             (LexerMode::Symbol, '(') => Ok(Token::Parenthesis(Parenthesis::Open)),
             (LexerMode::Symbol, ')') => Ok(Token::Parenthesis(Parenthesis::Close)),
-            (LexerMode::Literal, c) => Ok(Token::Primitive(Primitive::Literal(c))),
+            (LexerMode::Literal, c) => Ok(Token::Primitive(Value::Literal(c))),
             _ => Err(ParseTokenError),
         }
     }

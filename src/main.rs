@@ -4,12 +4,13 @@ use std::io;
 use std::io::prelude::*;
 
 mod data;
+mod interpreter;
 mod lexer;
 mod parser;
 
 enum Input {
     File(File),
-    Stdin(io::Stdin),
+    Stdin(std::io::Stdin),
 }
 
 impl Read for Input {
@@ -21,7 +22,7 @@ impl Read for Input {
     }
 }
 
-#[derive(Parser)]
+#[derive(clap::Parser)]
 #[command(version, about, long_about = None)]
 struct Args {
     #[arg(default_value = None)]
@@ -44,7 +45,18 @@ fn main() -> io::Result<()> {
         .map(|byte| byte as char);
 
     let lexer = lexer::Lexer::new(input_chars);
-    let tree: parser::AstNode = lexer.collect();
-    println!("{:#?}", tree);
+    let result: Result<parser::AstNode, parser::ParserError> = lexer.collect();
+    match result {
+        Ok(ast) => {
+            println!("AST:\n{:#?}", ast);
+            println!("EVALS TO:\n{:#?}", ast.eval(&interpreter::starting_env()));
+        }
+        Err(_) => {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Parser Error",
+            ));
+        }
+    }
     Ok(())
 }
