@@ -5,29 +5,31 @@ pub enum AstNode {
     Nil,
     Primitive(Value),
     Identifier(String),
-    Function(String, Vec<AstNode>),
+    // Function(name OR function defintion, args)
+    Pair(Box<AstNode>, Box<AstNode>) 
 }
 
-pub struct ParserError;
+#[derive(Debug)]
+pub struct ParserError(pub String);
 
 impl AstNode {
     fn parse<Iter: Iterator<Item = Token>>(iter: &mut Iter) -> Result<Self, ParserError> {
         match iter.next() {
-            Some(Token::Identifier(string)) => Ok(AstNode::Identifier(string.clone())),
-            Some(Token::Primitive(primitive)) => Ok(AstNode::Primitive(primitive)),
+            Some(Token::Identifier(identifier)) =>
+                Ok(AstNode::Identifier(identifier.clone())),
+            Some(Token::Primitive(primitive)) =>
+                Ok(AstNode::Primitive(primitive)),
             Some(Token::Parenthesis(Parenthesis::Open)) => {
-                let name = match Self::parse(iter) {
-                    Ok(AstNode::Identifier(name)) => name,
-                    Ok(AstNode::Function(name, _)) => name,
-                    _ => return Err(ParserError),
-                };
-                let args = std::iter::repeat_with(|| Self::parse(iter))
-                    .take_while(|result| match result {
-                        Ok(node) => *node != AstNode::Nil,
-                        Err(_) => true,
-                    })
-                    .collect::<Result<Vec<AstNode>, ParserError>>()?;
-                Ok(AstNode::Function(name, args))
+                let car = Self::parse(iter)?;
+                let cdr = Self::parse(iter)?;
+                match iter.next() {
+                    Some(Token::Parenthesis(Parenthesis::Close)) =>
+                        Ok(AstNode::Pair(Box::new(car), Box::new(cdr))),
+                    _ =>
+                    Err(ParserError(
+                        "Expected closing parenthesis for pair!".to_string()
+                    ))
+                }
             }
             _ => Ok(AstNode::Nil),
         }

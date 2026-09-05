@@ -51,10 +51,10 @@ fn main() -> io::Result<()> {
             println!("AST:\n{:#?}", ast);
             println!("EVALS TO:\n{:#?}", ast.eval(&interpreter::starting_env()));
         }
-        Err(_) => {
+        Err(parser::ParserError(error)) => {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
-                "Parser Error",
+                error,
             ));
         }
     }
