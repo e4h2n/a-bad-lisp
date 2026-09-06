@@ -128,6 +128,30 @@ pub fn starting_env() -> Environment {
         })),
     );
     bindings.insert(
+        "*".to_string(),
+        Bindee::Closure(rc::Rc::new(|x: AstNode, env: Environment| {
+            match x.eval(&env)? {
+                Bindee::Value(Value::Number(x)) => Ok(Bindee::Closure(rc::Rc::new(
+                    move |y: AstNode, env: Environment| {
+                        let y_value = y.eval(&env)?;
+                        match y_value {
+                            Bindee::Value(Value::Number(y)) => {
+                                Ok(Bindee::Value(Value::Number(x * y)))
+                            }
+                            _ => Err(InterpreterError(format!(
+                                "Second argument of '*' was non-numeric: {:?}!",
+                                y_value,
+                            ))),
+                        }
+                    },
+                ))),
+                _ => Err(InterpreterError(
+                    "First argument of '*' was non-numeric!".to_string(),
+                )),
+            }
+        })),
+    );
+    bindings.insert(
         "if".to_string(),
         Bindee::Closure(rc::Rc::new(
             |condition: AstNode, condition_env: Environment| {

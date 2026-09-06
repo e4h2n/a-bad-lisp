@@ -1,16 +1,16 @@
 (
-  let sum (
-    lambda help (
+  let factorialize (
+    lambda factorial (
       lambda n (
         if n
-        (+ n (help (+ n -1)))
-        0
+        (* n (factorial (+ n -1)))
+        1
       )
     )
   )
 
   (lambda f (f f))
-  (lambda recur (sum ((lambda x) ((recur recur) x))))
+  (lambda recur (factorialize ((lambda x) ((recur recur) x))))
 
   10
 )
