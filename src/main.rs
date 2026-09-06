@@ -1,9 +1,10 @@
 use clap::Parser;
 use std::fs::File;
-use std::io;
 use std::io::prelude::*;
+use std::io;
 
 mod data;
+mod environment;
 mod interpreter;
 mod lexer;
 mod parser;
@@ -49,7 +50,7 @@ fn main() -> io::Result<()> {
     match result {
         Ok(ast) => {
             // println!("AST:\n{:#?}", ast);
-            println!("EVALS TO:\n{:#?}", ast.eval(&interpreter::starting_env()));
+            println!("EVALS TO:\n{:#?}", ast.eval(&environment::starting_env()));
         }
         Err(parser::ParserError(error)) => {
             // TODO try to get the position lexer is at and print it out
