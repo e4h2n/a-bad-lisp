@@ -48,10 +48,11 @@ fn main() -> io::Result<()> {
     let result: Result<parser::AstNode, parser::ParserError> = lexer.collect();
     match result {
         Ok(ast) => {
-            println!("AST:\n{:#?}", ast);
+            // println!("AST:\n{:#?}", ast);
             println!("EVALS TO:\n{:#?}", ast.eval(&interpreter::starting_env()));
         }
         Err(parser::ParserError(error)) => {
+            // TODO try to get the position lexer is at and print it out
             return Err(std::io::Error::new(std::io::ErrorKind::Other, error));
         }
     }

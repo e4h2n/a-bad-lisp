@@ -28,6 +28,8 @@ impl AstNode {
                         "Expected closing parenthesis for pair!".to_string(),
                     )),
                 }
+                // (a b c d e) -> ((((a b) c) d) e)
+                // (a b c d e) -> (a (b (c (d (e nil)))))
             }
             _ => Ok(AstNode::Nil),
         }
