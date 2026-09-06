@@ -17,16 +17,13 @@ impl AstNode {
             Some(Token::Identifier(identifier)) => Ok(AstNode::Identifier(identifier.clone())),
             Some(Token::Primitive(primitive)) => Ok(AstNode::Primitive(primitive)),
             Some(Token::Parenthesis(Parenthesis::Open)) => {
-                let car = Self::parse(iter)?;
-                let cdr = Self::parse(iter)?;
-                match iter.next() {
-                    Some(Token::Parenthesis(Parenthesis::Close)) => {
-                        Ok(AstNode::Pair(Box::new(car), Box::new(cdr)))
-                    }
-                    _ => Err(ParserError(
-                        "Expected closing parenthesis for pair!".to_string(),
-                    )),
+                let mut combined = Self::parse(iter)?;
+                loop {
+                    let next = Self::parse(iter)?;
+                    if next == AstNode::Nil {break};
+                    combined = AstNode::Pair(Box::new(combined), Box::new(next));
                 }
+                Ok(combined)
             }
             _ => Ok(AstNode::Nil),
         }
