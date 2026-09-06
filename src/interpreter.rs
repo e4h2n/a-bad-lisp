@@ -126,7 +126,6 @@ pub fn starting_env() -> Environment {
     );
 
     bindings.insert(
-        // ((+ a) b)
         "+".to_string(),
         Bindee::Closure(rc::Rc::new(|x: AstNode, env: Environment| {
             match x.eval(&env)? {
@@ -150,10 +149,6 @@ pub fn starting_env() -> Environment {
             }
         })),
     );
-    // ((1 2) 3)
-    // (((if expr)
-    //  (then))
-    //  (else))
     bindings.insert(
         "if".to_string(),
         Bindee::Closure(rc::Rc::new(
