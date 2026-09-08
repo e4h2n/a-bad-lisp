@@ -1,4 +1,5 @@
 use crate::data::*;
+use crate::lexer::*;
 use crate::parser::*;
 
 use std::collections;
@@ -15,7 +16,8 @@ impl BitOr for &Environment {
     fn bitor(self, rhs: Self) -> Self::Output {
         Environment {
             bindings: self
-                .bindings.clone()
+                .bindings
+                .clone()
                 .into_iter()
                 .chain(rhs.bindings.clone().into_iter())
                 .collect(),
@@ -54,6 +56,31 @@ impl fmt::Debug for Bindee {
 // define an environment to start in
 pub fn starting_env() -> Environment {
     let mut bindings = collections::HashMap::new();
+
+    bindings.insert(
+        "lambda".to_string(),
+        Bindee::Closure(rc::Rc::new(|id: AstNode, lambda_env: Environment| {
+            let AstNode::Identifier(id) = id else {
+                return Err(InterpreterError(
+                    "Tried to write non-identifier function argument!".to_string(),
+                ));
+            };
+            Ok(Bindee::Closure(rc::Rc::new(
+                move |body: AstNode, _: Environment| {
+                    let id = id.clone();
+                    let lambda_env = lambda_env.clone();
+                    Ok(Bindee::Closure(rc::Rc::new(
+                        move |value: AstNode, caller_env: Environment| {
+                            let mut env = lambda_env.clone();
+                            env.bindings.insert(id.clone(), value.eval(&caller_env)?);
+                            body.eval(&env)
+                        },
+                    )))
+                },
+            )))
+        })),
+    );
+
     bindings.insert(
         "let".to_string(),
         Bindee::Closure(rc::Rc::new(|id: AstNode, _: Environment| {
@@ -79,21 +106,46 @@ pub fn starting_env() -> Environment {
     );
 
     bindings.insert(
-        "lambda".to_string(),
-        Bindee::Closure(rc::Rc::new(|id: AstNode, lambda_env: Environment| {
+        "letrec".to_string(),
+        Bindee::Closure(rc::Rc::new(|id: AstNode, _: Environment| {
             let AstNode::Identifier(id) = id else {
                 return Err(InterpreterError(
-                    "Tried to write non-identifier function argument!".to_string(),
+                    "Tried to bind non-identifier!".to_string(),
                 ));
             };
             Ok(Bindee::Closure(rc::Rc::new(
-                move |body: AstNode, _: Environment| {
+                move |value: AstNode, value_env: Environment| {
+                    let z_combinator: AstNode = Lexer::new(
+                        "
+                        (
+                    		lambda F (
+                    			(lambda f (f f))
+                    			(lambda recur (
+                    				F (lambda x (recur recur x))
+                    			))
+                    		)
+                    	)
+                    	"
+                        .chars(),
+                    )
+                    .collect::<Result<AstNode, ParserError>>()
+                    .unwrap();
                     let id = id.clone();
-                    let lambda_env = lambda_env.clone();
+                    let val = AstNode::Pair(
+                        Box::new(z_combinator),
+                        Box::new(AstNode::Pair(
+                            Box::new(AstNode::Pair(
+                                Box::new(AstNode::Identifier("lambda".to_string())),
+                                Box::new(AstNode::Identifier(id.clone())),
+                            )),
+                            Box::new(value),
+                        )),
+                    )
+                    .eval(&value_env)?;
                     Ok(Bindee::Closure(rc::Rc::new(
-                        move |value: AstNode, caller_env: Environment| {
-                            let mut env = lambda_env.clone();
-                            env.bindings.insert(id.clone(), value.eval(&caller_env)?);
+                        move |body: AstNode, _: Environment| {
+                            let mut env = value_env.clone();
+                            env.bindings.insert(id.clone(), val.clone());
                             body.eval(&env)
                         },
                     )))
@@ -165,14 +217,15 @@ pub fn starting_env() -> Environment {
                     }));
                 // discards 'then'
                 let otherwise_env = condition_env.clone();
-                let pick_otherwise = Bindee::Closure(rc::Rc::new(move |_: AstNode, _: Environment| {
-                    let otherwise_env = otherwise_env.clone();
-                    Ok(Bindee::Closure(rc::Rc::new(
-                        move |otherwise: AstNode, _: Environment| {
-                            otherwise.eval(&otherwise_env)
-                        },
-                    )))
-                }));
+                let pick_otherwise =
+                    Bindee::Closure(rc::Rc::new(move |_: AstNode, _: Environment| {
+                        let otherwise_env = otherwise_env.clone();
+                        Ok(Bindee::Closure(rc::Rc::new(
+                            move |otherwise: AstNode, _: Environment| {
+                                otherwise.eval(&otherwise_env)
+                            },
+                        )))
+                    }));
                 match condition.eval(&condition_env)? {
                     Bindee::Nil | Bindee::Value(Value::Number(0) | Value::Literal('\0')) => {
                         Ok(pick_otherwise)

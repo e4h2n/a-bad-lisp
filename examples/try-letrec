@@ -1,0 +1,7 @@
+(
+	letrec fact (lambda n (
+		if n
+		(* n (fact (+ n -1)))
+		1
+	)) (fact 10)
+)
