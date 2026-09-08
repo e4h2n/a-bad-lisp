@@ -1,10 +1,11 @@
 # TODO
-- Add Y combinator to starting environment
-  - Actually, we need the Z combinator because the language is currently eager
-    - Make it lazy?
 - Booleans and comparators
-- Tail recursion optimization (mostly just avoid unnecessary environment cloning)
+- Tail recursion optimization
 - Add comments to the language
 - Better error messages (track char #, ideally)
+- Add Y combinator to starting environment
+  - Actually, we need the Z combinator because the language is currently eager
+  - Shove it in a definition for letrec ig
+- BigInts?
 - Proper REPL
 - More examples

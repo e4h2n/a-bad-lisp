@@ -1,0 +1,22 @@
+(
+	let Z (
+		lambda F (
+			(lambda f (f f))
+			(lambda recur (
+				F (lambda x (recur recur x))
+			))
+		)
+	) (
+	let fibonacci (lambda n ((
+		Z (lambda recur (
+		  	lambda n (lambda i (lambda running_total (
+				  		if (+ n (* -1 i))
+				  		(recur n (+ i 1) (+ (* 2 running_total) i))
+				  		(+ running_total i)
+		  	)))
+		  )
+		)
+	) n 0 0))
+	(fibonacci 30)
+	)
+)
