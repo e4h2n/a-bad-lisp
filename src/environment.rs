@@ -1,5 +1,4 @@
 use crate::data::*;
-use crate::lexer::*;
 use crate::parser::*;
 
 use std::collections;
@@ -115,37 +114,63 @@ pub fn starting_env() -> Environment {
             };
             Ok(Bindee::Closure(rc::Rc::new(
                 move |value: AstNode, value_env: Environment| {
-                    let z_combinator: AstNode = Lexer::new(
-                        "
-                        (
-                    		lambda F (
-                    			(lambda f (f f))
-                    			(lambda recur (
-                    				F (lambda x (recur recur x))
-                    			))
-                    		)
-                    	)
-                    	"
-                        .chars(),
-                    )
-                    .collect::<Result<AstNode, ParserError>>()
-                    .unwrap();
-                    let id = id.clone();
-                    let val = AstNode::Pair(
-                        Box::new(z_combinator),
+                    let z_combinator = AstNode::Pair(
+                        Box::new(AstNode::Pair(
+                            Box::new(AstNode::Identifier("lambda".to_string())),
+                            Box::new(AstNode::Identifier("F".to_string())),
+                        )),
                         Box::new(AstNode::Pair(
                             Box::new(AstNode::Pair(
-                                Box::new(AstNode::Identifier("lambda".to_string())),
-                                Box::new(AstNode::Identifier(id.clone())),
+                                Box::new(AstNode::Pair(
+                                    Box::new(AstNode::Identifier("lambda".to_string())),
+                                    Box::new(AstNode::Identifier("f".to_string())),
+                                )),
+                                Box::new(AstNode::Pair(
+                                    Box::new(AstNode::Identifier("f".to_string())),
+                                    Box::new(AstNode::Identifier("f".to_string())),
+                                )),
                             )),
-                            Box::new(value),
+                            Box::new(AstNode::Pair(
+                                Box::new(AstNode::Pair(
+                                    Box::new(AstNode::Identifier("lambda".to_string())),
+                                    Box::new(AstNode::Identifier("recur".to_string())),
+                                )),
+                                Box::new(AstNode::Pair(
+                                    Box::new(AstNode::Identifier("F".to_string())),
+                                    Box::new(AstNode::Pair(
+                                        Box::new(AstNode::Pair(
+                                            Box::new(AstNode::Identifier("lambda".to_string())),
+                                            Box::new(AstNode::Identifier("x".to_string())),
+                                        )),
+                                        Box::new(AstNode::Pair(
+                                            Box::new(AstNode::Pair(
+                                                Box::new(AstNode::Identifier("recur".to_string())),
+                                                Box::new(AstNode::Identifier("recur".to_string())),
+                                            )),
+                                            Box::new(AstNode::Identifier("x".to_string())),
+                                        )),
+                                    )),
+                                )),
+                            )),
+                        )));
+                        
+                    let lambda_id_val = AstNode::Pair(
+                        Box::new(AstNode::Pair(
+                            Box::new(AstNode::Identifier("lambda".to_string())),
+                            Box::new(AstNode::Identifier(id.clone())),
                         )),
+                        Box::new(value)
+                    ); 
+                    let val = AstNode::Pair(
+                        Box::new(z_combinator),
+                        Box::new(lambda_id_val)
                     )
                     .eval(&value_env)?;
+
+                    let mut env = value_env.clone();
+                    env.bindings.insert(id.clone(), val.clone());
                     Ok(Bindee::Closure(rc::Rc::new(
                         move |body: AstNode, _: Environment| {
-                            let mut env = value_env.clone();
-                            env.bindings.insert(id.clone(), val.clone());
                             body.eval(&env)
                         },
                     )))
