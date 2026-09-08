@@ -10,15 +10,16 @@ use std::rc;
 pub struct Environment {
     bindings: collections::HashMap<String, Bindee>,
 }
-impl BitOr for Environment {
-    type Output = Self;
+impl BitOr for &Environment {
+    type Output = Environment;
     fn bitor(self, rhs: Self) -> Self::Output {
-        let mut new_env = Environment {
-            bindings: collections::HashMap::new(),
-        };
-        new_env.bindings.extend(self.bindings);
-        new_env.bindings.extend(rhs.bindings);
-        new_env
+        Environment {
+            bindings: self
+                .bindings.clone()
+                .into_iter()
+                .chain(rhs.bindings.clone().into_iter())
+                .collect(),
+        }
     }
 }
 impl Environment {
@@ -55,21 +56,19 @@ pub fn starting_env() -> Environment {
     let mut bindings = collections::HashMap::new();
     bindings.insert(
         "let".to_string(),
-        Bindee::Closure(rc::Rc::new(|id: AstNode, id_binding_env: Environment| {
+        Bindee::Closure(rc::Rc::new(|id: AstNode, _: Environment| {
             let AstNode::Identifier(id) = id else {
                 return Err(InterpreterError(
                     "Tried to bind non-identifier!".to_string(),
                 ));
             };
-            let env = id_binding_env.clone();
             Ok(Bindee::Closure(rc::Rc::new(
-                move |value: AstNode, value_binding_env: Environment| {
-                    let env = env.clone() | value_binding_env;
+                move |value: AstNode, value_env: Environment| {
                     let id = id.clone();
-                    let val = value.eval(&env)?;
+                    let val = value.eval(&value_env)?;
                     Ok(Bindee::Closure(rc::Rc::new(
-                        move |todo: AstNode, evaluation_env: Environment| {
-                            let mut env = env.clone() | evaluation_env;
+                        move |todo: AstNode, _: Environment| {
+                            let mut env = value_env.clone();
                             env.bindings.insert(id.clone(), val.clone());
                             todo.eval(&env)
                         },
@@ -81,20 +80,20 @@ pub fn starting_env() -> Environment {
 
     bindings.insert(
         "lambda".to_string(),
-        Bindee::Closure(rc::Rc::new(|id: AstNode, id_binding_env: Environment| {
+        Bindee::Closure(rc::Rc::new(|id: AstNode, lambda_env: Environment| {
             let AstNode::Identifier(id) = id else {
                 return Err(InterpreterError(
                     "Tried to write non-identifier function argument!".to_string(),
                 ));
             };
             Ok(Bindee::Closure(rc::Rc::new(
-                move |todo: AstNode, evaluation_env: Environment| {
+                move |todo: AstNode, _: Environment| {
                     let id = id.clone();
-                    let env = id_binding_env.clone() | evaluation_env;
+                    let lambda_env = lambda_env.clone();
                     Ok(Bindee::Closure(rc::Rc::new(
-                        move |value: AstNode, value_binding_env: Environment| {
-                            let mut env = env.clone() | value_binding_env;
-                            env.bindings.insert(id.clone(), value.eval(&env)?);
+                        move |value: AstNode, caller_env: Environment| {
+                            let mut env = lambda_env.clone();
+                            env.bindings.insert(id.clone(), value.eval(&caller_env)?);
                             todo.eval(&env)
                         },
                     )))
@@ -156,16 +155,20 @@ pub fn starting_env() -> Environment {
         Bindee::Closure(rc::Rc::new(
             |condition: AstNode, condition_env: Environment| {
                 // discards 'otherwise'
+                let then_env = condition_env.clone();
                 let pick_then =
-                    Bindee::Closure(rc::Rc::new(|then: AstNode, then_env: Environment| {
+                    Bindee::Closure(rc::Rc::new(move |then: AstNode, _: Environment| {
+                        let then_env = then_env.clone();
                         Ok(Bindee::Closure(rc::Rc::new(
                             move |_: AstNode, _: Environment| then.eval(&then_env),
                         )))
                     }));
                 // discards 'then'
-                let pick_otherwise = Bindee::Closure(rc::Rc::new(|_: AstNode, _: Environment| {
+                let otherwise_env = condition_env.clone();
+                let pick_otherwise = Bindee::Closure(rc::Rc::new(move |_: AstNode, _: Environment| {
+                    let otherwise_env = otherwise_env.clone();
                     Ok(Bindee::Closure(rc::Rc::new(
-                        move |otherwise: AstNode, otherwise_env: Environment| {
+                        move |otherwise: AstNode, _: Environment| {
                             otherwise.eval(&otherwise_env)
                         },
                     )))
