@@ -3,16 +3,18 @@
     lambda fib (
       lambda n (
         if (* n (+ n -1))
-        (+ (fib(+ n -1)) (fib (+ n -2)))
+        (+ (fib (+ n -1)) (fib (+ n -2)))
         n
       )
     )
   )
 
-  (lambda f (f f))
-  (lambda recur (
-    fibbonize (lambda x (recur recur x))
-  ))
+  (
+    (lambda f (f f))
+    (lambda recur (
+      fibbonize (lambda x (recur recur x))
+    ))
 
-  10
+    10
+  )
 )

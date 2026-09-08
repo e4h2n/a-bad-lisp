@@ -67,10 +67,10 @@ pub fn starting_env() -> Environment {
                     let id = id.clone();
                     let val = value.eval(&value_env)?;
                     Ok(Bindee::Closure(rc::Rc::new(
-                        move |todo: AstNode, _: Environment| {
+                        move |body: AstNode, _: Environment| {
                             let mut env = value_env.clone();
                             env.bindings.insert(id.clone(), val.clone());
-                            todo.eval(&env)
+                            body.eval(&env)
                         },
                     )))
                 },
@@ -87,14 +87,14 @@ pub fn starting_env() -> Environment {
                 ));
             };
             Ok(Bindee::Closure(rc::Rc::new(
-                move |todo: AstNode, _: Environment| {
+                move |body: AstNode, _: Environment| {
                     let id = id.clone();
                     let lambda_env = lambda_env.clone();
                     Ok(Bindee::Closure(rc::Rc::new(
                         move |value: AstNode, caller_env: Environment| {
                             let mut env = lambda_env.clone();
                             env.bindings.insert(id.clone(), value.eval(&caller_env)?);
-                            todo.eval(&env)
+                            body.eval(&env)
                         },
                     )))
                 },
