@@ -18,9 +18,10 @@ impl AstNode {
             Some(Token::Primitive(primitive)) => Ok(AstNode::Primitive(primitive)),
             Some(Token::Parenthesis(Parenthesis::Open)) => {
                 let mut combined = Self::parse(iter)?;
-                loop {
-                    let next = Self::parse(iter)?;
-                    if next == AstNode::Nil {break};
+                while let Ok(next) = Self::parse(iter) {
+                    if next == AstNode::Nil {
+                        break;
+                    };
                     combined = AstNode::Pair(Box::new(combined), Box::new(next));
                 }
                 Ok(combined)

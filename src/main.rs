@@ -1,7 +1,7 @@
 use clap::Parser;
 use std::fs::File;
-use std::io::prelude::*;
 use std::io;
+use std::io::prelude::*;
 
 mod data;
 mod environment;

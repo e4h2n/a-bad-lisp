@@ -1,0 +1,22 @@
+(
+	let Y (
+		lambda F (
+			(lambda f (f f))
+			(lambda recur (
+				F (lambda x (recur recur x))
+			))
+		)
+	) (
+	let fibonacci(
+		Y (lambda help (
+		  	lambda n (
+		  		if (* n (+ n -1))
+		  		(+ (help (+ n -2)) (help (+ n -1)))
+		  		n
+			  )
+		  )
+		)
+	)
+	(fibonacci 10)
+	)
+)

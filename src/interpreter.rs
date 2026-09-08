@@ -6,12 +6,9 @@ impl AstNode {
         return match self {
             AstNode::Nil => Ok(Bindee::Nil),
             AstNode::Primitive(primitive) => Ok(Bindee::Value(*primitive)),
-            AstNode::Identifier(identifier) => environment
-                .get(identifier)
-                .ok_or(InterpreterError(format!(
-                    "No binding found for identifier {}",
-                    identifier
-                ))),
+            AstNode::Identifier(identifier) => environment.get(identifier).ok_or(InterpreterError(
+                format!("No binding found for identifier {}", identifier),
+            )),
             AstNode::Pair(car, cdr) => {
                 if let Bindee::Closure(closure) = car.eval(environment)? {
                     closure(*cdr.clone(), environment.clone())
