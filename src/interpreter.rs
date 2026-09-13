@@ -10,7 +10,7 @@ impl AstNode {
                 format!("No binding found for identifier {}", identifier),
             )),
             AstNode::Pair(car, cdr) => {
-                if let Bindee::Closure(closure) = car.eval(environment)? {
+                if let Bindee::Procedure(closure) = car.eval(environment)? {
                     closure(*cdr.clone(), environment.clone())
                 } else {
                     Err(InterpreterError(format!(
