@@ -1,17 +1,26 @@
 use crate::data::*;
 use crate::parser::*;
 
+use std::cell::RefCell;
 use std::collections;
 use std::fmt;
-use std::rc;
+use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct Environment {
-    bindings: collections::HashMap<String, Bindee>,
+    bindings: collections::HashMap<String, Rc<RefCell<Bindee>>>,
 }
 impl Environment {
-    pub fn get(&self, key: &String) -> Option<Bindee> {
+    pub fn get(&self, key: &String) -> Option<Rc<RefCell<Bindee>>> {
         self.bindings.get(key).cloned()
+    }
+    pub fn set(&mut self, key: &String, value: Bindee) {
+        if let Some(binding) = self.get(key) {
+            *binding.borrow_mut() = value.clone();
+        } else {
+            self.bindings
+                .insert(key.clone(), Rc::new(RefCell::new(value)));
+        }
     }
 }
 
@@ -24,7 +33,7 @@ pub enum Bindee {
     Nil,
     Value(Value),
     Pair(Box<Bindee>, Box<Bindee>),
-    Procedure(rc::Rc<Closure>),
+    Procedure(Rc<Closure>),
 }
 
 impl fmt::Debug for Bindee {
@@ -44,195 +53,155 @@ pub fn starting_env() -> Environment {
 
     bindings.insert(
         "lambda".to_string(),
-        Bindee::Procedure(rc::Rc::new(|id: AstNode, lambda_env: Environment| {
-            let AstNode::Identifier(id) = id else {
-                return Err(InterpreterError(format!(
-                    "Tried to bind non-identifier `{:?}`!",
-                    id
-                )));
-            };
-            Ok(Bindee::Procedure(rc::Rc::new(
-                move |body: AstNode, _: Environment| {
-                    let id = id.clone();
-                    let lambda_env = lambda_env.clone();
-                    Ok(Bindee::Procedure(rc::Rc::new(
-                        move |value: AstNode, caller_env: Environment| {
-                            let mut env = lambda_env.clone();
-                            env.bindings.insert(id.clone(), value.eval(&caller_env)?);
-                            body.eval(&env)
-                        },
-                    )))
-                },
-            )))
-        })),
+        Rc::new(RefCell::new(Bindee::Procedure(Rc::new(
+            |id: AstNode, lambda_env: Environment| {
+                let AstNode::Identifier(id) = id else {
+                    return Err(InterpreterError(format!(
+                        "Tried to bind non-identifier `{:?}`!",
+                        id
+                    )));
+                };
+                Ok(Bindee::Procedure(Rc::new(
+                    move |body: AstNode, _: Environment| {
+                        let id = id.clone();
+                        let lambda_env = lambda_env.clone();
+                        Ok(Bindee::Procedure(Rc::new(
+                            move |value: AstNode, caller_env: Environment| {
+                                let mut env = lambda_env.clone();
+                                env.set(&id, value.eval(&caller_env)?);
+                                body.eval(&env)
+                            },
+                        )))
+                    },
+                )))
+            },
+        )))),
     );
     bindings.insert(
         "let".to_string(),
-        Bindee::Procedure(rc::Rc::new(|id: AstNode, _: Environment| {
-            let AstNode::Identifier(id) = id else {
-                return Err(InterpreterError(format!(
-                    "Tried to bind non-identifier `{:?}`!",
-                    id
-                )));
-            };
-            Ok(Bindee::Procedure(rc::Rc::new(
-                move |value: AstNode, value_env: Environment| {
-                    let id = id.clone();
-                    let val = value.eval(&value_env)?;
-                    Ok(Bindee::Procedure(rc::Rc::new(
-                        move |body: AstNode, _: Environment| {
-                            let mut env = value_env.clone();
-                            env.bindings.insert(id.clone(), val.clone());
-                            body.eval(&env)
-                        },
-                    )))
-                },
-            )))
-        })),
+        Rc::new(RefCell::new(Bindee::Procedure(Rc::new(
+            |id: AstNode, _: Environment| {
+                let AstNode::Identifier(id) = id else {
+                    return Err(InterpreterError(format!(
+                        "Tried to bind non-identifier `{:?}`!",
+                        id
+                    )));
+                };
+                Ok(Bindee::Procedure(Rc::new(
+                    move |value: AstNode, value_env: Environment| {
+                        let id = id.clone();
+                        let val = value.eval(&value_env)?;
+                        Ok(Bindee::Procedure(Rc::new(
+                            move |body: AstNode, _: Environment| {
+                                let mut env = value_env.clone();
+                                env.set(&id, val.clone());
+                                body.eval(&env)
+                            },
+                        )))
+                    },
+                )))
+            },
+        )))),
     );
     bindings.insert(
         "letrec".to_string(),
-        Bindee::Procedure(rc::Rc::new(|id: AstNode, _: Environment| {
-            let AstNode::Identifier(id) = id else {
-                return Err(InterpreterError(format!(
-                    "Tried to bind non-identifier `{:?}`!",
-                    id
-                )));
-            };
-            Ok(Bindee::Procedure(rc::Rc::new(
-                move |value: AstNode, value_env: Environment| {
-                    let z_combinator = AstNode::Pair(
-                        Box::new(AstNode::Pair(
-                            Box::new(AstNode::Identifier("lambda".to_string())),
-                            Box::new(AstNode::Identifier("F".to_string())),
-                        )),
-                        Box::new(AstNode::Pair(
-                            Box::new(AstNode::Pair(
-                                Box::new(AstNode::Pair(
-                                    Box::new(AstNode::Identifier("lambda".to_string())),
-                                    Box::new(AstNode::Identifier("f".to_string())),
-                                )),
-                                Box::new(AstNode::Pair(
-                                    Box::new(AstNode::Identifier("f".to_string())),
-                                    Box::new(AstNode::Identifier("f".to_string())),
-                                )),
-                            )),
-                            Box::new(AstNode::Pair(
-                                Box::new(AstNode::Pair(
-                                    Box::new(AstNode::Identifier("lambda".to_string())),
-                                    Box::new(AstNode::Identifier("recur".to_string())),
-                                )),
-                                Box::new(AstNode::Pair(
-                                    Box::new(AstNode::Identifier("F".to_string())),
-                                    Box::new(AstNode::Pair(
-                                        Box::new(AstNode::Pair(
-                                            Box::new(AstNode::Identifier("lambda".to_string())),
-                                            Box::new(AstNode::Identifier("x".to_string())),
-                                        )),
-                                        Box::new(AstNode::Pair(
-                                            Box::new(AstNode::Pair(
-                                                Box::new(AstNode::Identifier("recur".to_string())),
-                                                Box::new(AstNode::Identifier("recur".to_string())),
-                                            )),
-                                            Box::new(AstNode::Identifier("x".to_string())),
-                                        )),
-                                    )),
-                                )),
-                            )),
-                        )),
-                    );
-
-                    let lambda_id_val = AstNode::Pair(
-                        Box::new(AstNode::Pair(
-                            Box::new(AstNode::Identifier("lambda".to_string())),
-                            Box::new(AstNode::Identifier(id.clone())),
-                        )),
-                        Box::new(value),
-                    );
-                    let val = AstNode::Pair(Box::new(z_combinator), Box::new(lambda_id_val))
-                        .eval(&value_env)?;
-
-                    let mut env = value_env.clone();
-                    env.bindings.insert(id.clone(), val.clone());
-                    Ok(Bindee::Procedure(rc::Rc::new(
-                        move |body: AstNode, _: Environment| body.eval(&env),
-                    )))
-                },
-            )))
-        })),
+        Rc::new(RefCell::new(Bindee::Procedure(Rc::new(
+            |id: AstNode, _: Environment| {
+                let AstNode::Identifier(id) = id else {
+                    return Err(InterpreterError(format!(
+                        "Tried to bind non-identifier `{:?}`!",
+                        id
+                    )));
+                };
+                Ok(Bindee::Procedure(Rc::new(
+                    move |value: AstNode, value_env: Environment| {
+                        let mut env = value_env.clone();
+                        env.set(&id, Bindee::Nil); // dummy value
+                        let val = value.eval(&env)?;
+                        env.set(&id, val); // backpatch
+                        Ok(Bindee::Procedure(Rc::new(
+                            move |body: AstNode, _: Environment| body.eval(&env),
+                        )))
+                    },
+                )))
+            },
+        )))),
     );
 
     bindings.insert(
         "+".to_string(),
-        Bindee::Procedure(rc::Rc::new(|x: AstNode, env: Environment| {
-            let x_value = x.eval(&env)?;
-            match x_value {
-                Bindee::Value(Value::Number(x)) => Ok(Bindee::Procedure(rc::Rc::new(
-                    move |y: AstNode, env: Environment| {
-                        let y_value = y.eval(&env)?;
-                        match y_value {
-                            Bindee::Value(Value::Number(y)) => {
-                                Ok(Bindee::Value(Value::Number(x + y)))
+        Rc::new(RefCell::new(Bindee::Procedure(Rc::new(
+            |x: AstNode, env: Environment| {
+                let x_value = x.eval(&env)?;
+                match x_value {
+                    Bindee::Value(Value::Number(x)) => Ok(Bindee::Procedure(Rc::new(
+                        move |y: AstNode, env: Environment| {
+                            let y_value = y.eval(&env)?;
+                            match y_value {
+                                Bindee::Value(Value::Number(y)) => {
+                                    Ok(Bindee::Value(Value::Number(x + y)))
+                                }
+                                _ => Err(InterpreterError(format!(
+                                    "Second argument of '+' was non-numeric: {:?}!",
+                                    y_value,
+                                ))),
                             }
-                            _ => Err(InterpreterError(format!(
-                                "Second argument of '+' was non-numeric: {:?}!",
-                                y_value,
-                            ))),
-                        }
-                    },
-                ))),
-                _ => Err(InterpreterError(format!(
-                    "First argument of '+' was non-numeric: {:?}!",
-                    x_value
-                ))),
-            }
-        })),
+                        },
+                    ))),
+                    _ => Err(InterpreterError(format!(
+                        "First argument of '+' was non-numeric: {:?}!",
+                        x_value
+                    ))),
+                }
+            },
+        )))),
     );
     bindings.insert(
         "*".to_string(),
-        Bindee::Procedure(rc::Rc::new(|x: AstNode, env: Environment| {
-            let x_value = x.eval(&env)?;
-            match x_value {
-                Bindee::Value(Value::Number(x)) => Ok(Bindee::Procedure(rc::Rc::new(
-                    move |y: AstNode, env: Environment| {
-                        let y_value = y.eval(&env)?;
-                        match y_value {
-                            Bindee::Value(Value::Number(y)) => {
-                                Ok(Bindee::Value(Value::Number(x * y)))
+        Rc::new(RefCell::new(Bindee::Procedure(Rc::new(
+            |x: AstNode, env: Environment| {
+                let x_value = x.eval(&env)?;
+                match x_value {
+                    Bindee::Value(Value::Number(x)) => Ok(Bindee::Procedure(Rc::new(
+                        move |y: AstNode, env: Environment| {
+                            let y_value = y.eval(&env)?;
+                            match y_value {
+                                Bindee::Value(Value::Number(y)) => {
+                                    Ok(Bindee::Value(Value::Number(x * y)))
+                                }
+                                _ => Err(InterpreterError(format!(
+                                    "Second argument of '*' was non-numeric: {:?}!",
+                                    y_value,
+                                ))),
                             }
-                            _ => Err(InterpreterError(format!(
-                                "Second argument of '*' was non-numeric: {:?}!",
-                                y_value,
-                            ))),
-                        }
-                    },
-                ))),
-                _ => Err(InterpreterError(format!(
-                    "First argument of '*' was non-numeric: {:?}!",
-                    x_value
-                ))),
-            }
-        })),
+                        },
+                    ))),
+                    _ => Err(InterpreterError(format!(
+                        "First argument of '*' was non-numeric: {:?}!",
+                        x_value
+                    ))),
+                }
+            },
+        )))),
     );
     bindings.insert(
         "if".to_string(),
-        Bindee::Procedure(rc::Rc::new(
+        Rc::new(RefCell::new(Bindee::Procedure(Rc::new(
             |condition: AstNode, condition_env: Environment| {
                 // discards 'otherwise'
                 let then_env = condition_env.clone();
-                let pick_then =
-                    Bindee::Procedure(rc::Rc::new(move |then: AstNode, _: Environment| {
-                        let then_env = then_env.clone();
-                        Ok(Bindee::Procedure(rc::Rc::new(
-                            move |_: AstNode, _: Environment| then.eval(&then_env),
-                        )))
-                    }));
+                let pick_then = Bindee::Procedure(Rc::new(move |then: AstNode, _: Environment| {
+                    let then_env = then_env.clone();
+                    Ok(Bindee::Procedure(Rc::new(
+                        move |_: AstNode, _: Environment| then.eval(&then_env),
+                    )))
+                }));
                 // discards 'then'
                 let otherwise_env = condition_env.clone();
                 let pick_otherwise =
-                    Bindee::Procedure(rc::Rc::new(move |_: AstNode, _: Environment| {
+                    Bindee::Procedure(Rc::new(move |_: AstNode, _: Environment| {
                         let otherwise_env = otherwise_env.clone();
-                        Ok(Bindee::Procedure(rc::Rc::new(
+                        Ok(Bindee::Procedure(Rc::new(
                             move |otherwise: AstNode, _: Environment| {
                                 otherwise.eval(&otherwise_env)
                             },
@@ -245,7 +214,7 @@ pub fn starting_env() -> Environment {
                     _ => Ok(pick_then),
                 }
             },
-        )),
+        )))),
     );
     return Environment { bindings };
 }
