@@ -16,7 +16,7 @@ impl Environment {
     }
     pub fn set(&mut self, key: &String, value: Bindee) {
         if let Some(binding) = self.get(key) {
-            *binding.borrow_mut() = value.clone();
+            *binding.borrow_mut() = value;
         } else {
             self.bindings
                 .insert(key.clone(), Rc::new(RefCell::new(value)));
