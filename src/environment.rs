@@ -46,9 +46,9 @@ pub fn starting_env() -> Environment {
         "lambda".to_string(),
         Bindee::Procedure(rc::Rc::new(|id: AstNode, lambda_env: Environment| {
             let AstNode::Identifier(id) = id else {
-                return Err(InterpreterError(
-                    "Tried to write non-identifier function argument!".to_string(),
-                ));
+                return Err(InterpreterError(format!(
+                    "Tried to bind non-identifier `{:?}`!", id
+                )));
             };
             Ok(Bindee::Procedure(rc::Rc::new(
                 move |body: AstNode, _: Environment| {
@@ -65,14 +65,13 @@ pub fn starting_env() -> Environment {
             )))
         })),
     );
-
     bindings.insert(
         "let".to_string(),
         Bindee::Procedure(rc::Rc::new(|id: AstNode, _: Environment| {
             let AstNode::Identifier(id) = id else {
-                return Err(InterpreterError(
-                    "Tried to bind non-identifier!".to_string(),
-                ));
+                return Err(InterpreterError(format!(
+                    "Tried to bind non-identifier `{:?}`!", id
+                )));
             };
             Ok(Bindee::Procedure(rc::Rc::new(
                 move |value: AstNode, value_env: Environment| {
@@ -89,14 +88,13 @@ pub fn starting_env() -> Environment {
             )))
         })),
     );
-
     bindings.insert(
         "letrec".to_string(),
         Bindee::Procedure(rc::Rc::new(|id: AstNode, _: Environment| {
             let AstNode::Identifier(id) = id else {
-                return Err(InterpreterError(
-                    "Tried to bind non-identifier!".to_string(),
-                ));
+                return Err(InterpreterError(format!(
+                    "Tried to bind non-identifier `{:?}`!", id
+                )));
             };
             Ok(Bindee::Procedure(rc::Rc::new(
                 move |value: AstNode, value_env: Environment| {
@@ -168,7 +166,8 @@ pub fn starting_env() -> Environment {
     bindings.insert(
         "+".to_string(),
         Bindee::Procedure(rc::Rc::new(|x: AstNode, env: Environment| {
-            match x.eval(&env)? {
+            let x_value = x.eval(&env)?;
+            match x_value {
                 Bindee::Value(Value::Number(x)) => Ok(Bindee::Procedure(rc::Rc::new(
                     move |y: AstNode, env: Environment| {
                         let y_value = y.eval(&env)?;
@@ -183,16 +182,18 @@ pub fn starting_env() -> Environment {
                         }
                     },
                 ))),
-                _ => Err(InterpreterError(
-                    "First argument of '+' was non-numeric!".to_string(),
-                )),
+                _ => Err(InterpreterError(format!(
+                    "First argument of '+' was non-numeric: {:?}!",
+                    x_value
+                ))),
             }
         })),
     );
     bindings.insert(
         "*".to_string(),
         Bindee::Procedure(rc::Rc::new(|x: AstNode, env: Environment| {
-            match x.eval(&env)? {
+            let x_value = x.eval(&env)?;
+            match x_value {
                 Bindee::Value(Value::Number(x)) => Ok(Bindee::Procedure(rc::Rc::new(
                     move |y: AstNode, env: Environment| {
                         let y_value = y.eval(&env)?;
@@ -207,9 +208,10 @@ pub fn starting_env() -> Environment {
                         }
                     },
                 ))),
-                _ => Err(InterpreterError(
-                    "First argument of '*' was non-numeric!".to_string(),
-                )),
+                _ => Err(InterpreterError(format!(
+                    "First argument of '*' was non-numeric: {:?}!",
+                    x_value
+                ))),
             }
         })),
     );
