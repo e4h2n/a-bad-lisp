@@ -47,7 +47,8 @@ pub fn starting_env() -> Environment {
         Bindee::Procedure(rc::Rc::new(|id: AstNode, lambda_env: Environment| {
             let AstNode::Identifier(id) = id else {
                 return Err(InterpreterError(format!(
-                    "Tried to bind non-identifier `{:?}`!", id
+                    "Tried to bind non-identifier `{:?}`!",
+                    id
                 )));
             };
             Ok(Bindee::Procedure(rc::Rc::new(
@@ -70,7 +71,8 @@ pub fn starting_env() -> Environment {
         Bindee::Procedure(rc::Rc::new(|id: AstNode, _: Environment| {
             let AstNode::Identifier(id) = id else {
                 return Err(InterpreterError(format!(
-                    "Tried to bind non-identifier `{:?}`!", id
+                    "Tried to bind non-identifier `{:?}`!",
+                    id
                 )));
             };
             Ok(Bindee::Procedure(rc::Rc::new(
@@ -93,7 +95,8 @@ pub fn starting_env() -> Environment {
         Bindee::Procedure(rc::Rc::new(|id: AstNode, _: Environment| {
             let AstNode::Identifier(id) = id else {
                 return Err(InterpreterError(format!(
-                    "Tried to bind non-identifier `{:?}`!", id
+                    "Tried to bind non-identifier `{:?}`!",
+                    id
                 )));
             };
             Ok(Bindee::Procedure(rc::Rc::new(
@@ -136,27 +139,23 @@ pub fn starting_env() -> Environment {
                                     )),
                                 )),
                             )),
-                        )));
-                        
+                        )),
+                    );
+
                     let lambda_id_val = AstNode::Pair(
                         Box::new(AstNode::Pair(
                             Box::new(AstNode::Identifier("lambda".to_string())),
                             Box::new(AstNode::Identifier(id.clone())),
                         )),
-                        Box::new(value)
-                    ); 
-                    let val = AstNode::Pair(
-                        Box::new(z_combinator),
-                        Box::new(lambda_id_val)
-                    )
-                    .eval(&value_env)?;
+                        Box::new(value),
+                    );
+                    let val = AstNode::Pair(Box::new(z_combinator), Box::new(lambda_id_val))
+                        .eval(&value_env)?;
 
                     let mut env = value_env.clone();
                     env.bindings.insert(id.clone(), val.clone());
                     Ok(Bindee::Procedure(rc::Rc::new(
-                        move |body: AstNode, _: Environment| {
-                            body.eval(&env)
-                        },
+                        move |body: AstNode, _: Environment| body.eval(&env),
                     )))
                 },
             )))
