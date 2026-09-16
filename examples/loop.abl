@@ -1,0 +1,10 @@
+(
+	letrec loop (
+		lambda x (
+			if x
+			(loop (+ -1 x))
+			0
+		)
+	)
+	(loop 100000)
+)

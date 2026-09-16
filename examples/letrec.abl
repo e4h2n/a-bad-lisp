@@ -1,5 +1,5 @@
 (
-	letrec fact (lambda n (
+	let fact (lambda n (
 		if n
 		(* n (fact (+ n -1)))
 		1

@@ -27,13 +27,18 @@ impl Environment {
 #[derive(Debug)]
 pub struct InterpreterError(pub String);
 
-pub type Closure = dyn Fn(AstNode, Environment) -> Result<Bindee, InterpreterError>;
+pub type Closure = dyn Fn(AstNode, Environment) -> Result<EvalResult, InterpreterError>;
 #[derive(Clone)]
 pub enum Bindee {
     Nil,
     Value(Value),
     Pair(Box<Bindee>, Box<Bindee>),
     Procedure(Rc<Closure>),
+}
+
+pub enum EvalResult {
+    Final(Bindee),
+    Continuation(AstNode, Environment),
 }
 
 impl fmt::Debug for Bindee {
@@ -61,24 +66,24 @@ pub fn starting_env() -> Environment {
                         id
                     )));
                 };
-                Ok(Bindee::Procedure(Rc::new(
+                Ok(EvalResult::Final(Bindee::Procedure(Rc::new(
                     move |body: AstNode, _: Environment| {
                         let id = id.clone();
                         let lambda_env = lambda_env.clone();
-                        Ok(Bindee::Procedure(Rc::new(
+                        Ok(EvalResult::Final(Bindee::Procedure(Rc::new(
                             move |value: AstNode, caller_env: Environment| {
                                 let mut env = lambda_env.clone();
                                 env.set(&id, value.eval(&caller_env)?);
-                                body.eval(&env)
+                                Ok(EvalResult::Continuation(body.clone(), env))
                             },
-                        )))
+                        ))))
                     },
-                )))
+                ))))
             },
         )))),
     );
     bindings.insert(
-        "let".to_string(),
+        "let".to_string(), // this is actually letrec
         Rc::new(RefCell::new(Bindee::Procedure(Rc::new(
             |id: AstNode, _: Environment| {
                 let AstNode::Identifier(id) = id else {
@@ -87,43 +92,19 @@ pub fn starting_env() -> Environment {
                         id
                     )));
                 };
-                Ok(Bindee::Procedure(Rc::new(
-                    move |value: AstNode, value_env: Environment| {
-                        let id = id.clone();
-                        let val = value.eval(&value_env)?;
-                        Ok(Bindee::Procedure(Rc::new(
-                            move |body: AstNode, _: Environment| {
-                                let mut env = value_env.clone();
-                                env.set(&id, val.clone());
-                                body.eval(&env)
-                            },
-                        )))
-                    },
-                )))
-            },
-        )))),
-    );
-    bindings.insert(
-        "letrec".to_string(),
-        Rc::new(RefCell::new(Bindee::Procedure(Rc::new(
-            |id: AstNode, _: Environment| {
-                let AstNode::Identifier(id) = id else {
-                    return Err(InterpreterError(format!(
-                        "Tried to bind non-identifier `{:?}`!",
-                        id
-                    )));
-                };
-                Ok(Bindee::Procedure(Rc::new(
+                Ok(EvalResult::Final(Bindee::Procedure(Rc::new(
                     move |value: AstNode, value_env: Environment| {
                         let mut env = value_env.clone();
                         env.set(&id, Bindee::Nil); // dummy value
                         let val = value.eval(&env)?;
                         env.set(&id, val); // backpatch
-                        Ok(Bindee::Procedure(Rc::new(
-                            move |body: AstNode, _: Environment| body.eval(&env),
-                        )))
+                        Ok(EvalResult::Final(Bindee::Procedure(Rc::new(
+                            move |body: AstNode, _: Environment| {
+                                Ok(EvalResult::Continuation(body, env.clone()))
+                            },
+                        ))))
                     },
-                )))
+                ))))
             },
         )))),
     );
@@ -134,19 +115,19 @@ pub fn starting_env() -> Environment {
             |x: AstNode, env: Environment| {
                 let x_value = x.eval(&env)?;
                 match x_value {
-                    Bindee::Value(Value::Number(x)) => Ok(Bindee::Procedure(Rc::new(
-                        move |y: AstNode, env: Environment| {
+                    Bindee::Value(Value::Number(x)) => Ok(EvalResult::Final(Bindee::Procedure(
+                        Rc::new(move |y: AstNode, env: Environment| {
                             let y_value = y.eval(&env)?;
                             match y_value {
                                 Bindee::Value(Value::Number(y)) => {
-                                    Ok(Bindee::Value(Value::Number(x + y)))
+                                    Ok(EvalResult::Final(Bindee::Value(Value::Number(x + y))))
                                 }
                                 _ => Err(InterpreterError(format!(
                                     "Second argument of '+' was non-numeric: {:?}!",
                                     y_value,
                                 ))),
                             }
-                        },
+                        }),
                     ))),
                     _ => Err(InterpreterError(format!(
                         "First argument of '+' was non-numeric: {:?}!",
@@ -162,19 +143,19 @@ pub fn starting_env() -> Environment {
             |x: AstNode, env: Environment| {
                 let x_value = x.eval(&env)?;
                 match x_value {
-                    Bindee::Value(Value::Number(x)) => Ok(Bindee::Procedure(Rc::new(
-                        move |y: AstNode, env: Environment| {
+                    Bindee::Value(Value::Number(x)) => Ok(EvalResult::Final(Bindee::Procedure(
+                        Rc::new(move |y: AstNode, env: Environment| {
                             let y_value = y.eval(&env)?;
                             match y_value {
                                 Bindee::Value(Value::Number(y)) => {
-                                    Ok(Bindee::Value(Value::Number(x * y)))
+                                    Ok(EvalResult::Final(Bindee::Value(Value::Number(x * y))))
                                 }
                                 _ => Err(InterpreterError(format!(
                                     "Second argument of '*' was non-numeric: {:?}!",
                                     y_value,
                                 ))),
                             }
-                        },
+                        }),
                     ))),
                     _ => Err(InterpreterError(format!(
                         "First argument of '*' was non-numeric: {:?}!",
@@ -192,26 +173,28 @@ pub fn starting_env() -> Environment {
                 let then_env = condition_env.clone();
                 let pick_then = Bindee::Procedure(Rc::new(move |then: AstNode, _: Environment| {
                     let then_env = then_env.clone();
-                    Ok(Bindee::Procedure(Rc::new(
-                        move |_: AstNode, _: Environment| then.eval(&then_env),
-                    )))
+                    Ok(EvalResult::Final(Bindee::Procedure(Rc::new(
+                        move |_: AstNode, _: Environment| {
+                            Ok(EvalResult::Continuation(then.clone(), then_env.clone()))
+                        },
+                    ))))
                 }));
                 // discards 'then'
                 let otherwise_env = condition_env.clone();
                 let pick_otherwise =
                     Bindee::Procedure(Rc::new(move |_: AstNode, _: Environment| {
                         let otherwise_env = otherwise_env.clone();
-                        Ok(Bindee::Procedure(Rc::new(
+                        Ok(EvalResult::Final(Bindee::Procedure(Rc::new(
                             move |otherwise: AstNode, _: Environment| {
-                                otherwise.eval(&otherwise_env)
+                                Ok(EvalResult::Continuation(otherwise, otherwise_env.clone()))
                             },
-                        )))
+                        ))))
                     }));
                 match condition.eval(&condition_env)? {
                     Bindee::Nil | Bindee::Value(Value::Number(0) | Value::Literal('\0')) => {
-                        Ok(pick_otherwise)
+                        Ok(EvalResult::Final(pick_otherwise))
                     }
-                    _ => Ok(pick_then),
+                    _ => Ok(EvalResult::Final(pick_then)),
                 }
             },
         )))),
