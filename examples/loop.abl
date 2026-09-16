@@ -1,5 +1,5 @@
 (
-	letrec loop (
+	let loop (
 		lambda x (
 			if x
 			(loop (+ -1 x))
