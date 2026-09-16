@@ -22,11 +22,11 @@ impl AstNode {
                 AstNode::Pair(car, cdr) => {
                     if let Bindee::Procedure(closure) = car.eval(&curr_env)? {
                         match closure(*cdr.clone(), curr_env.clone())? {
-                            EvalResult::Continuation(body, env) => {
+                            ClosureResult::Continuation(body, env) => {
                                 curr_node = body.clone();
                                 curr_env = env.clone();
                             }
-                            EvalResult::Final(bindee) => return Ok(bindee),
+                            ClosureResult::Final(bindee) => return Ok(bindee),
                         }
                     } else {
                         return Err(InterpreterError(format!(

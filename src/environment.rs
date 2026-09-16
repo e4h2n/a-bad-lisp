@@ -27,7 +27,7 @@ impl Environment {
 #[derive(Debug)]
 pub struct InterpreterError(pub String);
 
-pub type Closure = dyn Fn(AstNode, Environment) -> Result<EvalResult, InterpreterError>;
+pub type Closure = dyn Fn(AstNode, Environment) -> Result<ClosureResult, InterpreterError>;
 #[derive(Clone)]
 pub enum Bindee {
     Nil,
@@ -36,7 +36,7 @@ pub enum Bindee {
     Procedure(Rc<Closure>),
 }
 
-pub enum EvalResult {
+pub enum ClosureResult {
     Final(Bindee),
     Continuation(AstNode, Environment),
 }
@@ -66,15 +66,15 @@ pub fn starting_env() -> Environment {
                         id
                     )));
                 };
-                Ok(EvalResult::Final(Bindee::Procedure(Rc::new(
+                Ok(ClosureResult::Final(Bindee::Procedure(Rc::new(
                     move |body: AstNode, _: Environment| {
                         let id = id.clone();
                         let lambda_env = lambda_env.clone();
-                        Ok(EvalResult::Final(Bindee::Procedure(Rc::new(
+                        Ok(ClosureResult::Final(Bindee::Procedure(Rc::new(
                             move |value: AstNode, caller_env: Environment| {
                                 let mut env = lambda_env.clone();
                                 env.set(&id, value.eval(&caller_env)?);
-                                Ok(EvalResult::Continuation(body.clone(), env))
+                                Ok(ClosureResult::Continuation(body.clone(), env))
                             },
                         ))))
                     },
@@ -92,15 +92,15 @@ pub fn starting_env() -> Environment {
                         id
                     )));
                 };
-                Ok(EvalResult::Final(Bindee::Procedure(Rc::new(
+                Ok(ClosureResult::Final(Bindee::Procedure(Rc::new(
                     move |value: AstNode, value_env: Environment| {
                         let mut env = value_env.clone();
                         env.set(&id, Bindee::Nil); // dummy value
                         let val = value.eval(&env)?;
                         env.set(&id, val); // backpatch
-                        Ok(EvalResult::Final(Bindee::Procedure(Rc::new(
+                        Ok(ClosureResult::Final(Bindee::Procedure(Rc::new(
                             move |body: AstNode, _: Environment| {
-                                Ok(EvalResult::Continuation(body, env.clone()))
+                                Ok(ClosureResult::Continuation(body, env.clone()))
                             },
                         ))))
                     },
@@ -115,12 +115,12 @@ pub fn starting_env() -> Environment {
             |x: AstNode, env: Environment| {
                 let x_value = x.eval(&env)?;
                 match x_value {
-                    Bindee::Value(Value::Number(x)) => Ok(EvalResult::Final(Bindee::Procedure(
+                    Bindee::Value(Value::Number(x)) => Ok(ClosureResult::Final(Bindee::Procedure(
                         Rc::new(move |y: AstNode, env: Environment| {
                             let y_value = y.eval(&env)?;
                             match y_value {
                                 Bindee::Value(Value::Number(y)) => {
-                                    Ok(EvalResult::Final(Bindee::Value(Value::Number(x + y))))
+                                    Ok(ClosureResult::Final(Bindee::Value(Value::Number(x + y))))
                                 }
                                 _ => Err(InterpreterError(format!(
                                     "Second argument of '+' was non-numeric: {:?}!",
@@ -143,12 +143,12 @@ pub fn starting_env() -> Environment {
             |x: AstNode, env: Environment| {
                 let x_value = x.eval(&env)?;
                 match x_value {
-                    Bindee::Value(Value::Number(x)) => Ok(EvalResult::Final(Bindee::Procedure(
+                    Bindee::Value(Value::Number(x)) => Ok(ClosureResult::Final(Bindee::Procedure(
                         Rc::new(move |y: AstNode, env: Environment| {
                             let y_value = y.eval(&env)?;
                             match y_value {
                                 Bindee::Value(Value::Number(y)) => {
-                                    Ok(EvalResult::Final(Bindee::Value(Value::Number(x * y))))
+                                    Ok(ClosureResult::Final(Bindee::Value(Value::Number(x * y))))
                                 }
                                 _ => Err(InterpreterError(format!(
                                     "Second argument of '*' was non-numeric: {:?}!",
@@ -173,9 +173,9 @@ pub fn starting_env() -> Environment {
                 let then_env = condition_env.clone();
                 let pick_then = Bindee::Procedure(Rc::new(move |then: AstNode, _: Environment| {
                     let then_env = then_env.clone();
-                    Ok(EvalResult::Final(Bindee::Procedure(Rc::new(
+                    Ok(ClosureResult::Final(Bindee::Procedure(Rc::new(
                         move |_: AstNode, _: Environment| {
-                            Ok(EvalResult::Continuation(then.clone(), then_env.clone()))
+                            Ok(ClosureResult::Continuation(then.clone(), then_env.clone()))
                         },
                     ))))
                 }));
@@ -184,17 +184,20 @@ pub fn starting_env() -> Environment {
                 let pick_otherwise =
                     Bindee::Procedure(Rc::new(move |_: AstNode, _: Environment| {
                         let otherwise_env = otherwise_env.clone();
-                        Ok(EvalResult::Final(Bindee::Procedure(Rc::new(
+                        Ok(ClosureResult::Final(Bindee::Procedure(Rc::new(
                             move |otherwise: AstNode, _: Environment| {
-                                Ok(EvalResult::Continuation(otherwise, otherwise_env.clone()))
+                                Ok(ClosureResult::Continuation(
+                                    otherwise,
+                                    otherwise_env.clone(),
+                                ))
                             },
                         ))))
                     }));
                 match condition.eval(&condition_env)? {
                     Bindee::Nil | Bindee::Value(Value::Number(0) | Value::Literal('\0')) => {
-                        Ok(EvalResult::Final(pick_otherwise))
+                        Ok(ClosureResult::Final(pick_otherwise))
                     }
-                    _ => Ok(EvalResult::Final(pick_then)),
+                    _ => Ok(ClosureResult::Final(pick_then)),
                 }
             },
         )))),
