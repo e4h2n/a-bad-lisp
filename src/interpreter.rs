@@ -5,8 +5,6 @@ impl AstNode {
     pub fn eval(&self, environment: &Environment) -> Result<Bindee, InterpreterError> {
         let mut curr_node = self.clone();
         let mut curr_env = environment.clone();
-        // eval needs to pass environment to further evals somehow, but we need to patch environment externally
-        // meaning eval's shared ref will exist when we want to modify env
         loop {
             match curr_node {
                 AstNode::Nil => return Ok(Bindee::Nil),
