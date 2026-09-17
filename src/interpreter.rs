@@ -5,6 +5,8 @@ impl AstNode {
     pub fn eval(&self, environment: &Environment) -> Result<Bindee, InterpreterError> {
         let mut curr_node = self.clone();
         let mut curr_env = environment.clone();
+        // eval needs to pass environment to further evals somehow, but we need to patch environment externally
+        // meaning eval's shared ref will exist when we want to modify env
         loop {
             match curr_node {
                 AstNode::Nil => return Ok(Bindee::Nil),
@@ -21,10 +23,10 @@ impl AstNode {
                 }
                 AstNode::Pair(car, cdr) => {
                     if let Bindee::Procedure(closure) = car.eval(&curr_env)? {
-                        match closure(*cdr.clone(), curr_env.clone())? {
+                        match closure(*cdr, curr_env)? {
                             ClosureResult::Continuation(body, env) => {
-                                curr_node = body.clone();
-                                curr_env = env.clone();
+                                curr_node = body;
+                                curr_env = env;
                             }
                             ClosureResult::Final(bindee) => return Ok(bindee),
                         }
