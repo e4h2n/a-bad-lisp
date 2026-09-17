@@ -93,14 +93,13 @@ pub fn starting_env() -> Environment {
                     )));
                 };
                 Ok(ClosureResult::Final(Bindee::Procedure(Rc::new(
-                    move |value: AstNode, value_env: Environment| {
-                        let mut env = value_env.clone();
-                        env.set(&id, Bindee::Nil); // dummy value
-                        let val = value.eval(&env)?;
-                        env.set(&id, val); // backpatch
+                    move |value: AstNode, mut value_env: Environment| {
+                        value_env.set(&id, Bindee::Nil); // dummy value
+                        let val = value.eval(&value_env)?;
+                        value_env.set(&id, val); // backpatch
                         Ok(ClosureResult::Final(Bindee::Procedure(Rc::new(
                             move |body: AstNode, _: Environment| {
-                                Ok(ClosureResult::Continuation(body, env.clone()))
+                                Ok(ClosureResult::Continuation(body, value_env.clone()))
                             },
                         ))))
                     },
